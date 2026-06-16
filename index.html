@@ -343,14 +343,14 @@ function renderBits() {
             <button class="icon-btn" onclick="openEditBit(${b.id})" title="Edit">✏️</button>
             <button class="icon-btn del" onclick="deleteBit(${b.id})" title="Delete">🗑</button>
           </div>
-          <span class="chevron ${isOpen?'open'}">▾</span>
+          <span class="chevron ${isOpen ? 'open' : ''}">▾</span>
         </div>
-        <div class="bit-detail ${isOpen?'open'}">
-          ${beats.length ? `<ul class="beats-list">${beats.map(beat => {
+        <div class="bit-detail ${isOpen ? 'open' : ''}">
+          ${beats.length ? '<ul class="beats-list">' + beats.map(beat => {
             const isPunch = beat.includes('[PUNCH]');
             const text = beat.replace('[PUNCH]','').trim();
-            return `<li><div class="beat-dot"></div><span>${text}${isPunch?'<span class="punch">PUNCH</span>':''}</span></li>`;
-          }).join('')}</ul>` : '<span style="font-size:13px;color:var(--text3)">No beats added yet.</span>'}
+            return '<li><div class="beat-dot"></div><span>' + text + (isPunch ? '<span class="punch">PUNCH</span>' : '') + '</span></li>';
+          }).join('') + '</ul>' : '<span style="font-size:13px;color:var(--text3)">No beats added yet.</span>'}
         </div>
       </div>`;
     }).join('');
@@ -444,9 +444,9 @@ function renderSets() {
           <span class="set-dur">${fmtDur(dur)}</span>
           <span class="set-target">/ ${fmtDur(s.target)}</span>
           <button class="icon-btn del" style="margin-left:4px" onclick="event.stopPropagation();deleteSet(${s.id})">🗑</button>
-          <span class="chevron ${isOpen?'open'}">▾</span>
+          <span class="chevron ${isOpen ? 'open' : ''}">▾</span>
         </div>
-        <div class="set-body ${isOpen?'open'}">
+        <div class="set-body ${isOpen ? 'open' : ''}">
           <div class="prog-wrap"><div class="prog-bar ${over?'over':''}" style="width:${pct}%"></div></div>
           <div class="timeline" id="tl-${s.id}"
             ondragover="onTLDragOver(event,${s.id})"
@@ -456,25 +456,24 @@ function renderSets() {
               ? bitIds.map((bid, idx) => {
                   const b = bits.find(x => x.id === bid);
                   if (!b) return '';
-                  return `<div class="tbit" id="tb-${s.id}-${bid}" draggable="true"
-                    ondragstart="onBDragStart(event,${s.id},${bid})"
-                    ondragend="onBDragEnd()"
-                    ondragover="onBDragOver(event,${s.id},${idx})"
-                    ondrop="onBReorder(event,${s.id},${idx})">
-                    <span class="tbit-num">${idx+1}</span>
-                    <div class="cat-bar bar-${b.cat}" style="height:18px;width:3px"></div>
-                    <span class="tbit-title">${b.title}</span>
-                    <span class="tbit-dur">${fmtDur(b.dur)}</span>
-                    <button class="tbit-rm" onclick="removeBitFromSet(${s.id},${bid})">×</button>
-                  </div>`;
+                  return '<div class="tbit" id="tb-' + s.id + '-' + bid + '" draggable="true"' +
+                    ' ondragstart="onBDragStart(event,' + s.id + ',' + bid + ')"' +
+                    ' ondragend="onBDragEnd()"' +
+                    ' ondragover="onBDragOver(event,' + s.id + ',' + idx + ')"' +
+                    ' ondrop="onBReorder(event,' + s.id + ',' + idx + ')">' +
+                    '<span class="tbit-num">' + (idx+1) + '</span>' +
+                    '<div class="cat-bar bar-' + b.cat + '" style="height:18px;width:3px"></div>' +
+                    '<span class="tbit-title">' + b.title + '</span>' +
+                    '<span class="tbit-dur">' + fmtDur(b.dur) + '</span>' +
+                    '<button class="tbit-rm" onclick="removeBitFromSet(' + s.id + ',' + bid + ')">×</button>' +
+                    '</div>';
                 }).join('')
-              : `<div class="drop-zone" id="dz-${s.id}">Drop bits here to build your set</div>`}
+              : '<div class="drop-zone" id="dz-' + s.id + '">Drop bits here to build your set</div>'}
           </div>
-          ${available.length ? `
-            <div class="add-bits-label">Add a bit</div>
-            <div class="add-chips">
-              ${available.map(b => `<button class="add-chip" onclick="addBitToSet(${s.id},${b.id})">${b.title} <span style="opacity:.5;font-size:10px">${fmtDur(b.dur)}</span></button>`).join('')}
-            </div>` : ''}
+          ${available.length ?
+            '<div class="add-bits-label">Add a bit</div><div class="add-chips">' +
+            available.map(b => '<button class="add-chip" onclick="addBitToSet(' + s.id + ',' + b.id + ')">' + b.title + ' <span style="opacity:.5;font-size:10px">' + fmtDur(b.dur) + '</span></button>').join('') +
+            '</div>' : ''}
         </div>
       </div>`;
     }).join('');
