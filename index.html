@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bits">
+<meta name="theme-color" content="#0F0E0D">
+<title>Standup Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0F0E0D;
+    --surface: #1A1917;
+    --surface2: #232220;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #EDE8DF;
+    --text2: #A09890;
+    --text3: #5E5A55;
+    --amber: #F5A623;
+    --amber-dim: rgba(245,166,35,0.12);
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Top bar */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(15,14,13,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 16px 16px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .topbar-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .app-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+  .app-title span { color: var(--amber); }
+
+  .tabs { display: flex; gap: 0; }
+  .tab { flex: 1; text-align: center; padding: 10px 0; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text3); border: none; background: none; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+
+  /* Content */
+  .content { padding: 16px; max-width: 600px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Stats */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat { background: var(--surface); border-radius: var(--radius); padding: 12px; }
+  .stat-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 700; font-family: 'SF Mono', 'Fira Mono', monospace; color: var(--text); }
+
+  /* Filters */
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chip { font-size: 12px; padding: 5px 11px; border-radius: 999px; border: 0.5px solid var(--border2); cursor: pointer; color: var(--text2); background: transparent; transition: all 0.12s; white-space: nowrap; }
+  .chip.active { background: var(--amber); color: #0F0E0D; border-color: transparent; font-weight: 600; }
+
+  /* Bit cards */
+  .bit-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 8px; overflow: hidden; }
+  .bit-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; }
+  .cat-bar { width: 3px; height: 32px; border-radius: 2px; flex-shrink: 0; }
+  .bit-info { flex: 1; min-width: 0; }
+  .bit-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  .bit-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+  .cat-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; }
+  .dur { font-size: 12px; color: var(--text3); font-family: 'SF Mono', 'Fira Mono', monospace; }
+  .bit-btns { display: flex; gap: 2px; }
+  .icon-btn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: none; background: none; cursor: pointer; color: var(--text3); border-radius: 8px; font-size: 16px; transition: all 0.12s; }
+  .icon-btn:hover { background: var(--surface2); color: var(--text); }
+  .icon-btn.del:hover { color: #e74c3c; }
+  .chevron { font-size: 12px; color: var(--text3); margin-left: 2px; transition: transform 0.2s; }
+  .chevron.open { transform: rotate(180deg); }
+
+  .bit-detail { display: none; border-top: 0.5px solid var(--border); padding: 12px 14px 14px 27px; background: var(--surface2); }
+  .bit-detail.open { display: block; }
+  .beats-list { list-style: none; }
+  .beats-list li { font-size: 13px; color: var(--text2); padding: 4px 0; display: flex; gap: 8px; align-items: flex-start; line-height: 1.5; }
+  .beat-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text3); margin-top: 7px; flex-shrink: 0; }
+  .punch { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; background: var(--amber-dim); color: var(--amber); margin-left: 6px; letter-spacing: 0.05em; vertical-align: middle; }
+
+  /* Category colors */
+  .c-opener { background: #1a2e10; color: #7ec850; }
+  .c-closer { background: #2e1f08; color: #e8a030; }
+  .c-story { background: #0d1f35; color: #5b9fd6; }
+  .c-joke { background: #1c1535; color: #9b8fe8; }
+  .c-clean { background: #0a2620; color: #3cc49a; }
+  .c-standard { background: #1e1d1b; color: #888680; }
+
+  .bar-opener { background: #7ec850; }
+  .bar-closer { background: #e8a030; }
+  .bar-story { background: #5b9fd6; }
+  .bar-joke { background: #9b8fe8; }
+  .bar-clean { background: #3cc49a; }
+  .bar-standard { background: #888680; }
+
+  /* FAB */
+  .fab { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: 20px; width: 52px; height: 52px; border-radius: 50%; background: var(--amber); color: #0F0E0D; border: none; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(245,166,35,0.35); z-index: 40; font-weight: 300; transition: transform 0.15s; }
+  .fab:active { transform: scale(0.94); }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: none; align-items: flex-end; justify-content: center; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); width: 100%; max-width: 600px; max-height: 90dvh; overflow-y: auto; }
+  .modal-handle { width: 36px; height: 4px; background: var(--border2); border-radius: 2px; margin: 0 auto 18px; }
+  .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 18px; }
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; display: block; }
+  .form-input { width: 100%; padding: 11px 13px; font-size: 15px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--surface2); color: var(--text); font-family: inherit; }
+  .form-input:focus { outline: none; border-color: var(--amber); }
+  textarea.form-input { resize: none; min-height: 130px; font-size: 13px; font-family: 'SF Mono', 'Fira Mono', monospace; line-height: 1.6; }
+  .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  select.form-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+  .hint { font-size: 11px; color: var(--text3); margin-top: 5px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .btn { flex: 1; padding: 13px; font-size: 15px; font-weight: 600; border-radius: var(--radius); border: none; cursor: pointer; transition: opacity 0.12s; }
+  .btn-cancel { background: var(--surface2); color: var(--text2); }
+  .btn-save { background: var(--amber); color: #0F0E0D; }
+  .btn:active { opacity: 0.8; }
+
+  /* Sets */
+  .set-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 10px; overflow: hidden; }
+  .set-header { display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer; }
+  .set-name { font-size: 14px; font-weight: 600; flex: 1; }
+  .set-dur { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 13px; color: var(--text2); }
+  .set-target { font-size: 11px; color: var(--text3); }
+  .set-body { border-top: 0.5px solid var(--border); padding: 12px 14px; background: var(--surface2); display: none; }
+  .set-body.open { display: block; }
+
+  .prog-wrap { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 12px; overflow: hidden; }
+  .prog-bar { height: 100%; border-radius: 2px; background: #3cc49a; transition: width 0.3s; }
+  .prog-bar.over { background: #e74c3c; }
+
+  .timeline { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .tbit { display: flex; align-items: center; gap: 9px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 9px 11px; cursor: grab; touch-action: none; }
+  .tbit.dragging { opacity: 0.35; }
+  .tbit.drag-over { border-color: var(--amber); }
+  .tbit-num { font-size: 11px; font-family: 'SF Mono', 'Fira Mono', monospace; color: var(--text3); min-width: 18px; }
+  .tbit-title { font-size: 13px; font-weight: 500; flex: 1; }
+  .tbit-dur { font-size: 11px; font-family: 'SF Mono', 'Fira Mono', monospace; color: var(--text3); }
+  .tbit-rm { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 16px; padding: 2px 4px; }
+  .tbit-rm:hover { color: #e74c3c; }
+
+  .drop-zone { border: 1.5px dashed var(--border2); border-radius: var(--radius); padding: 14px; font-size: 13px; color: var(--text3); text-align: center; margin-bottom: 8px; transition: all 0.15s; }
+  .drop-zone.over { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+
+  .add-bits-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 7px; }
+  .add-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .add-chip { font-size: 12px; padding: 5px 11px; border-radius: 999px; border: 0.5px solid var(--border2); cursor: pointer; color: var(--text2); background: transparent; }
+  .add-chip:active { background: var(--surface); }
+
+  .empty { text-align: center; padding: 48px 16px; color: var(--text3); font-size: 14px; }
+
+  /* Loading / toast */
+  .loading { display: flex; align-items: center; justify-content: center; height: 120px; color: var(--text3); font-size: 14px; gap: 8px; }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border2); border-top-color: var(--amber); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface); border: 0.5px solid var(--border2); color: var(--text); font-size: 13px; padding: 10px 18px; border-radius: 999px; opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; z-index: 200; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Sets panel FAB area */
+  #panel-sets .fab-spacer { height: 70px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="app-title">stand<span>up</span></div>
+    <div id="loading-ind" style="font-size:12px;color:var(--text3);display:none">saving…</div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('bits')">🎤 My Bits</button>
+    <button class="tab" onclick="showTab('sets')">📋 Sets</button>
+  </div>
+</div>
+
+<div class="content">
+  <div id="panel-bits" class="panel active">
+    <div id="bits-content"><div class="loading"><div class="spinner"></div> Loading…</div></div>
+  </div>
+  <div id="panel-sets" class="panel">
+    <div id="sets-content"><div class="loading"><div class="spinner"></div> Loading…</div></div>
+    <div class="fab-spacer"></div>
+  </div>
+</div>
+
+<button class="fab" id="fab" onclick="onFab()">+</button>
+
+<!-- Bit modal -->
+<div class="modal-bg" id="modal-bit">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-bit-title">New bit</h3>
+    <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="f-title" placeholder="What's the bit called?"></div>
+    <div class="form-row2">
+      <div class="form-group"><label class="form-label">Category</label>
+        <select class="form-input" id="f-cat">
+          <option value="standard">Standard</option>
+          <option value="opener">Opener</option>
+          <option value="closer">Closer</option>
+          <option value="story">Story</option>
+          <option value="joke">Joke</option>
+          <option value="clean">Clean</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Length (min)</label><input class="form-input" id="f-dur" type="number" min="0.5" step="0.5" placeholder="e.g. 3"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Beats / transcript</label>
+      <textarea class="form-input" id="f-beats" placeholder="One beat per line.&#10;Add [PUNCH] at end of punchlines.&#10;&#10;e.g. Setup line&#10;Escalation beat&#10;The punchline [PUNCH]"></textarea>
+      <p class="hint">One beat per line · add [PUNCH] to mark punchlines</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeBitModal()">Cancel</button>
+      <button class="btn btn-save" onclick="saveBit()">Save bit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Set modal -->
+<div class="modal-bg" id="modal-set">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3>New set</h3>
+    <div class="form-group"><label class="form-label">Set name</label><input class="form-input" id="fs-name" placeholder='e.g. "Friday late show"'></div>
+    <div class="form-group"><label class="form-label">Target length (min)</label><input class="form-input" id="fs-target" type="number" min="1" step="1" placeholder="e.g. 10"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeSetModal()">Cancel</button>
+      <button class="btn btn-save" onclick="saveSet()">Create set</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://tbslhtslndxibvnpoixd.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRic2xodHNsbmR4aWJ2bnBvaXhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2NDExMjksImV4cCI6MjA5NzIxNzEyOX0.4LHGN9-HSm9h_AmQcuEYbBI9Wr0VS4-9VfDmNAvQ_Dc';
+
+const H = { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Prefer': 'return=representation' };
+
+async function dbGet(table) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?order=id`, { headers: H });
+  return r.json();
+}
+async function dbInsert(table, data) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, { method: 'POST', headers: H, body: JSON.stringify(data) });
+  const j = await r.json(); return Array.isArray(j) ? j[0] : j;
+}
+async function dbUpdate(table, id, data) {
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method: 'PATCH', headers: H, body: JSON.stringify(data) });
+}
+async function dbDelete(table, id) {
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method: 'DELETE', headers: H });
+}
+
+const CATS = { opener:'Opener', closer:'Closer', story:'Story', joke:'Joke', clean:'Clean', standard:'Standard' };
+let bits = [], sets = [];
+let openBits = new Set(), openSets = new Set();
+let activeFilter = 'all';
+let editingBitId = null;
+let activeTab = 'bits';
+let dragSrcSetId = null, dragSrcBitId = null, dragSrcIdx = null;
+
+function fmtDur(min) {
+  const m = Math.floor(min), s = Math.round((min - m) * 60);
+  return s > 0 ? `${m}:${s.toString().padStart(2,'0')}` : `${m}:00`;
+}
+function totalDur(bitIds) {
+  return bitIds.reduce((a, id) => { const b = bits.find(x => x.id === id); return a + (b ? b.dur : 0); }, 0);
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+function saving(on) { document.getElementById('loading-ind').style.display = on ? '' : 'none'; }
+
+async function init() {
+  [bits, sets] = await Promise.all([dbGet('bits'), dbGet('sets')]);
+  bits = bits || []; sets = sets || [];
+  renderBits(); renderSets();
+}
+
+function showTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['bits','sets'][i] === tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+function onFab() { activeTab === 'bits' ? openAddBit() : openAddSet(); }
+
+// ── BITS ──────────────────────────────────────────────────────
+function renderBits() {
+  const filtered = activeFilter === 'all' ? bits : bits.filter(b => b.cat === activeFilter);
+  const total = bits.length;
+  const totalMin = bits.reduce((a,b) => a + Number(b.dur), 0);
+  const punches = bits.reduce((a,b) => a + (b.beats||[]).filter(x=>x.includes('[PUNCH]')).length, 0);
+
+  let html = `
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Bits</div><div class="stat-val">${total}</div></div>
+      <div class="stat"><div class="stat-label">Material</div><div class="stat-val">${fmtDur(totalMin)}</div></div>
+      <div class="stat"><div class="stat-label">Punches</div><div class="stat-val">${punches}</div></div>
+    </div>
+    <div class="filter-row">
+      ${[['all','All'], ...Object.entries(CATS)].map(([v,l]) =>
+        `<button class="chip ${activeFilter===v?'active':''}" onclick="setFilter('${v}')">${l}</button>`).join('')}
+    </div>`;
+
+  if (!filtered.length) {
+    html += `<div class="empty">No bits yet.<br>Tap + to add your first one.</div>`;
+  } else {
+    html += filtered.map(b => {
+      const beats = b.beats || [];
+      const isOpen = openBits.has(b.id);
+      return `
+      <div class="bit-card">
+        <div class="bit-header" onclick="toggleBit(${b.id})">
+          <div class="cat-bar bar-${b.cat}"></div>
+          <div class="bit-info">
+            <div class="bit-title">${b.title}</div>
+            <div class="bit-meta">
+              <span class="cat-badge c-${b.cat}">${CATS[b.cat]}</span>
+              <span class="dur">${fmtDur(b.dur)}</span>
+            </div>
+          </div>
+          <div class="bit-btns" onclick="event.stopPropagation()">
+            <button class="icon-btn" onclick="openEditBit(${b.id})" title="Edit">✏️</button>
+            <button class="icon-btn del" onclick="deleteBit(${b.id})" title="Delete">🗑</button>
+          </div>
+          <span class="chevron ${isOpen?'open'}">▾</span>
+        </div>
+        <div class="bit-detail ${isOpen?'open'}">
+          ${beats.length ? `<ul class="beats-list">${beats.map(beat => {
+            const isPunch = beat.includes('[PUNCH]');
+            const text = beat.replace('[PUNCH]','').trim();
+            return `<li><div class="beat-dot"></div><span>${text}${isPunch?'<span class="punch">PUNCH</span>':''}</span></li>`;
+          }).join('')}</ul>` : '<span style="font-size:13px;color:var(--text3)">No beats added yet.</span>'}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('bits-content').innerHTML = html;
+}
+
+function setFilter(cat) { activeFilter = cat; renderBits(); }
+function toggleBit(id) { openBits.has(id) ? openBits.delete(id) : openBits.add(id); renderBits(); }
+
+function openAddBit() {
+  editingBitId = null;
+  document.getElementById('modal-bit-title').textContent = 'New bit';
+  document.getElementById('f-title').value = '';
+  document.getElementById('f-cat').value = 'standard';
+  document.getElementById('f-dur').value = '';
+  document.getElementById('f-beats').value = '';
+  document.getElementById('modal-bit').classList.add('open');
+  setTimeout(() => document.getElementById('f-title').focus(), 100);
+}
+function openEditBit(id) {
+  const b = bits.find(x => x.id === id);
+  if (!b) return;
+  editingBitId = id;
+  document.getElementById('modal-bit-title').textContent = 'Edit bit';
+  document.getElementById('f-title').value = b.title;
+  document.getElementById('f-cat').value = b.cat;
+  document.getElementById('f-dur').value = b.dur;
+  document.getElementById('f-beats').value = (b.beats||[]).join('\n');
+  document.getElementById('modal-bit').classList.add('open');
+}
+function closeBitModal() { document.getElementById('modal-bit').classList.remove('open'); }
+
+async function saveBit() {
+  const title = document.getElementById('f-title').value.trim();
+  const cat = document.getElementById('f-cat').value;
+  const dur = parseFloat(document.getElementById('f-dur').value) || 0;
+  const beatsRaw = document.getElementById('f-beats').value.trim();
+  const beats = beatsRaw ? beatsRaw.split('\n').map(s=>s.trim()).filter(Boolean) : [];
+  if (!title) { document.getElementById('f-title').focus(); return; }
+  closeBitModal();
+  saving(true);
+  try {
+    if (editingBitId) {
+      await dbUpdate('bits', editingBitId, { title, cat, dur, beats });
+      const b = bits.find(x => x.id === editingBitId);
+      Object.assign(b, { title, cat, dur, beats });
+      toast('Bit updated');
+    } else {
+      const created = await dbInsert('bits', { title, cat, dur, beats });
+      bits.push(created);
+      toast('Bit added');
+    }
+  } catch(e) { toast('Error saving bit'); }
+  saving(false);
+  renderBits(); renderSets();
+}
+
+async function deleteBit(id) {
+  if (!confirm('Delete this bit?')) return;
+  saving(true);
+  await dbDelete('bits', id);
+  bits = bits.filter(b => b.id !== id);
+  for (const s of sets) {
+    const before = [...s.bit_ids];
+    s.bit_ids = s.bit_ids.filter(x => x !== id);
+    if (s.bit_ids.length !== before.length) await dbUpdate('sets', s.id, { bit_ids: s.bit_ids });
+  }
+  saving(false);
+  toast('Bit deleted');
+  renderBits(); renderSets();
+}
+
+// ── SETS ──────────────────────────────────────────────────────
+function renderSets() {
+  let html = '';
+  if (!sets.length) {
+    html = `<div class="empty">No sets yet.<br>Tap + to build your first setlist.</div>`;
+  } else {
+    html = sets.map(s => {
+      const bitIds = s.bit_ids || [];
+      const dur = totalDur(bitIds);
+      const pct = Math.min(100, Math.round((dur / s.target) * 100));
+      const over = dur > s.target;
+      const available = bits.filter(b => !bitIds.includes(b.id));
+      const isOpen = openSets.has(s.id);
+      return `
+      <div class="set-card" id="sc-${s.id}">
+        <div class="set-header" onclick="toggleSet(${s.id})">
+          <div class="set-name">${s.name}</div>
+          <span class="set-dur">${fmtDur(dur)}</span>
+          <span class="set-target">/ ${fmtDur(s.target)}</span>
+          <button class="icon-btn del" style="margin-left:4px" onclick="event.stopPropagation();deleteSet(${s.id})">🗑</button>
+          <span class="chevron ${isOpen?'open'}">▾</span>
+        </div>
+        <div class="set-body ${isOpen?'open'}">
+          <div class="prog-wrap"><div class="prog-bar ${over?'over':''}" style="width:${pct}%"></div></div>
+          <div class="timeline" id="tl-${s.id}"
+            ondragover="onTLDragOver(event,${s.id})"
+            ondrop="onTLDrop(event,${s.id})"
+            ondragleave="onTLDragLeave(event,${s.id})">
+            ${bitIds.length
+              ? bitIds.map((bid, idx) => {
+                  const b = bits.find(x => x.id === bid);
+                  if (!b) return '';
+                  return `<div class="tbit" id="tb-${s.id}-${bid}" draggable="true"
+                    ondragstart="onBDragStart(event,${s.id},${bid})"
+                    ondragend="onBDragEnd()"
+                    ondragover="onBDragOver(event,${s.id},${idx})"
+                    ondrop="onBReorder(event,${s.id},${idx})">
+                    <span class="tbit-num">${idx+1}</span>
+                    <div class="cat-bar bar-${b.cat}" style="height:18px;width:3px"></div>
+                    <span class="tbit-title">${b.title}</span>
+                    <span class="tbit-dur">${fmtDur(b.dur)}</span>
+                    <button class="tbit-rm" onclick="removeBitFromSet(${s.id},${bid})">×</button>
+                  </div>`;
+                }).join('')
+              : `<div class="drop-zone" id="dz-${s.id}">Drop bits here to build your set</div>`}
+          </div>
+          ${available.length ? `
+            <div class="add-bits-label">Add a bit</div>
+            <div class="add-chips">
+              ${available.map(b => `<button class="add-chip" onclick="addBitToSet(${s.id},${b.id})">${b.title} <span style="opacity:.5;font-size:10px">${fmtDur(b.dur)}</span></button>`).join('')}
+            </div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('sets-content').innerHTML = html;
+}
+
+function toggleSet(id) { openSets.has(id) ? openSets.delete(id) : openSets.add(id); renderSets(); }
+
+function openAddSet() {
+  document.getElementById('fs-name').value = '';
+  document.getElementById('fs-target').value = '';
+  document.getElementById('modal-set').classList.add('open');
+  setTimeout(() => document.getElementById('fs-name').focus(), 100);
+}
+function closeSetModal() { document.getElementById('modal-set').classList.remove('open'); }
+
+async function saveSet() {
+  const name = document.getElementById('fs-name').value.trim();
+  const target = parseFloat(document.getElementById('fs-target').value) || 10;
+  if (!name) { document.getElementById('fs-name').focus(); return; }
+  closeSetModal();
+  saving(true);
+  try {
+    const created = await dbInsert('sets', { name, target, bit_ids: [] });
+    sets.push(created);
+    openSets.add(created.id);
+    toast('Set created');
+  } catch(e) { toast('Error creating set'); }
+  saving(false);
+  renderSets();
+}
+
+async function deleteSet(id) {
+  if (!confirm('Delete this set?')) return;
+  saving(true);
+  await dbDelete('sets', id);
+  sets = sets.filter(s => s.id !== id);
+  saving(false);
+  toast('Set deleted');
+  renderSets();
+}
+
+async function addBitToSet(setId, bitId) {
+  const s = sets.find(x => x.id === setId);
+  if (!s || s.bit_ids.includes(bitId)) return;
+  s.bit_ids = [...s.bit_ids, bitId];
+  await dbUpdate('sets', setId, { bit_ids: s.bit_ids });
+  renderSets();
+}
+
+async function removeBitFromSet(setId, bitId) {
+  const s = sets.find(x => x.id === setId);
+  if (!s) return;
+  s.bit_ids = s.bit_ids.filter(x => x !== bitId);
+  await dbUpdate('sets', setId, { bit_ids: s.bit_ids });
+  renderSets();
+}
+
+// ── DRAG & DROP ───────────────────────────────────────────────
+function onBDragStart(e, setId, bitId) {
+  dragSrcSetId = setId; dragSrcBitId = bitId;
+  const s = sets.find(x => x.id === setId);
+  dragSrcIdx = s ? s.bit_ids.indexOf(bitId) : -1;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => { const el = document.getElementById(`tb-${setId}-${bitId}`); if(el) el.classList.add('dragging'); }, 0);
+}
+function onBDragEnd() {
+  document.querySelectorAll('.tbit.dragging').forEach(el => el.classList.remove('dragging'));
+  document.querySelectorAll('.tbit.drag-over').forEach(el => el.classList.remove('drag-over'));
+}
+function onBDragOver(e, setId, idx) {
+  e.preventDefault();
+  if (dragSrcSetId !== setId) return;
+  document.querySelectorAll('.tbit.drag-over').forEach(el => el.classList.remove('drag-over'));
+  const s = sets.find(x => x.id === setId);
+  if (s) { const el = document.getElementById(`tb-${setId}-${s.bit_ids[idx]}`); if(el) el.classList.add('drag-over'); }
+}
+async function onBReorder(e, setId, toIdx) {
+  e.preventDefault(); e.stopPropagation();
+  if (dragSrcSetId !== setId || dragSrcIdx === null || dragSrcIdx === toIdx) return;
+  const s = sets.find(x => x.id === setId);
+  if (!s) return;
+  const moved = s.bit_ids.splice(dragSrcIdx, 1)[0];
+  s.bit_ids.splice(toIdx, 0, moved);
+  await dbUpdate('sets', setId, { bit_ids: s.bit_ids });
+  renderSets();
+}
+function onTLDragOver(e, setId) {
+  e.preventDefault();
+  const dz = document.getElementById(`dz-${setId}`);
+  if (dz) dz.classList.add('over');
+}
+async function onTLDrop(e, setId) {
+  e.preventDefault();
+  const dz = document.getElementById(`dz-${setId}`);
+  if (dz) dz.classList.remove('over');
+  if (dragSrcBitId !== null && dragSrcSetId !== setId) await addBitToSet(setId, dragSrcBitId);
+}
+function onTLDragLeave(e, setId) {
+  const dz = document.getElementById(`dz-${setId}`);
+  if (dz) dz.classList.remove('over');
+}
+
+// Close modals on backdrop tap
+document.getElementById('modal-bit').addEventListener('click', e => { if(e.target === e.currentTarget) closeBitModal(); });
+document.getElementById('modal-set').addEventListener('click', e => { if(e.target === e.currentTarget) closeSetModal(); });
+
+init();
+</script>
+</body>
+</html>
