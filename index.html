@@ -124,6 +124,10 @@
   .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   select.form-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
   .hint { font-size: 11px; color: var(--text3); margin-top: 5px; }
+  .cat-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cat-check { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: var(--radius); border: 0.5px solid var(--border2); background: var(--surface2); cursor: pointer; font-size: 13px; color: var(--text2); transition: all 0.12s; user-select: none; }
+  .cat-check input { display: none; }
+  .cat-check.checked { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); font-weight: 600; }
   .modal-actions { display: flex; gap: 8px; margin-top: 18px; }
   .btn { flex: 1; padding: 13px; font-size: 15px; font-weight: 600; border-radius: var(--radius); border: none; cursor: pointer; transition: opacity 0.12s; }
   .btn-cancel { background: var(--surface2); color: var(--text2); }
@@ -207,15 +211,16 @@
     <h3 id="modal-bit-title">New bit</h3>
     <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="f-title" placeholder="What's the bit called?"></div>
     <div class="form-row2">
-      <div class="form-group"><label class="form-label">Category</label>
-        <select class="form-input" id="f-cat">
-          <option value="standard">Standard</option>
-          <option value="opener">Opener</option>
-          <option value="closer">Closer</option>
-          <option value="story">Story</option>
-          <option value="joke">Joke</option>
-          <option value="clean">Clean</option>
-        </select>
+      <div class="form-group" style="grid-column: 1 / -1">
+        <label class="form-label">Categories (pick any that apply)</label>
+        <div class="cat-checks" id="f-cats">
+          <label class="cat-check" data-cat="standard"><input type="checkbox" value="standard"> Standard</label>
+          <label class="cat-check" data-cat="opener"><input type="checkbox" value="opener"> Opener</label>
+          <label class="cat-check" data-cat="closer"><input type="checkbox" value="closer"> Closer</label>
+          <label class="cat-check" data-cat="story"><input type="checkbox" value="story"> Story</label>
+          <label class="cat-check" data-cat="joke"><input type="checkbox" value="joke"> Joke</label>
+          <label class="cat-check" data-cat="clean"><input type="checkbox" value="clean"> Clean</label>
+        </div>
       </div>
       <div class="form-group"><label class="form-label">Length (min)</label><input class="form-input" id="f-dur" type="number" min="0.5" step="0.5" placeholder="e.g. 3"></div>
     </div>
@@ -306,7 +311,7 @@ function onFab() { activeTab === 'bits' ? openAddBit() : openAddSet(); }
 
 // ── BITS ──────────────────────────────────────────────────────
 function renderBits() {
-  const filtered = activeFilter === 'all' ? bits : bits.filter(b => b.cat === activeFilter);
+  const filtered = activeFilter === 'all' ? bits : bits.filter(b => (b.cats||[]).includes(activeFilter));
   const total = bits.length;
   const totalMin = bits.reduce((a,b) => a + Number(b.dur), 0);
   const punches = bits.reduce((a,b) => a + (b.beats||[]).filter(x=>x.includes('[PUNCH]')).length, 0);
@@ -327,15 +332,17 @@ function renderBits() {
   } else {
     html += filtered.map(b => {
       const beats = b.beats || [];
+      const cats = b.cats || [];
+      const primaryCat = cats[0] || 'standard';
       const isOpen = openBits.has(b.id);
       return `
       <div class="bit-card">
         <div class="bit-header" onclick="toggleBit(${b.id})">
-          <div class="cat-bar bar-${b.cat}"></div>
+          <div class="cat-bar bar-${primaryCat}"></div>
           <div class="bit-info">
             <div class="bit-title">${b.title}</div>
             <div class="bit-meta">
-              <span class="cat-badge c-${b.cat}">${CATS[b.cat]}</span>
+              ${cats.map(c => '<span class="cat-badge c-' + c + '">' + CATS[c] + '</span>').join('')}
               <span class="dur">${fmtDur(b.dur)}</span>
             </div>
           </div>
@@ -361,11 +368,23 @@ function renderBits() {
 function setFilter(cat) { activeFilter = cat; renderBits(); }
 function toggleBit(id) { openBits.has(id) ? openBits.delete(id) : openBits.add(id); renderBits(); }
 
+function setCatCheckboxes(selected) {
+  document.querySelectorAll('#f-cats .cat-check').forEach(label => {
+    const cb = label.querySelector('input');
+    const on = selected.includes(cb.value);
+    cb.checked = on;
+    label.classList.toggle('checked', on);
+  });
+}
+function getCatCheckboxes() {
+  return Array.from(document.querySelectorAll('#f-cats .cat-check input:checked')).map(cb => cb.value);
+}
+
 function openAddBit() {
   editingBitId = null;
   document.getElementById('modal-bit-title').textContent = 'New bit';
   document.getElementById('f-title').value = '';
-  document.getElementById('f-cat').value = 'standard';
+  setCatCheckboxes(['standard']);
   document.getElementById('f-dur').value = '';
   document.getElementById('f-beats').value = '';
   document.getElementById('modal-bit').classList.add('open');
@@ -377,7 +396,7 @@ function openEditBit(id) {
   editingBitId = id;
   document.getElementById('modal-bit-title').textContent = 'Edit bit';
   document.getElementById('f-title').value = b.title;
-  document.getElementById('f-cat').value = b.cat;
+  setCatCheckboxes(b.cats || []);
   document.getElementById('f-dur').value = b.dur;
   document.getElementById('f-beats').value = (b.beats||[]).join('\n');
   document.getElementById('modal-bit').classList.add('open');
@@ -386,21 +405,22 @@ function closeBitModal() { document.getElementById('modal-bit').classList.remove
 
 async function saveBit() {
   const title = document.getElementById('f-title').value.trim();
-  const cat = document.getElementById('f-cat').value;
+  const cats = getCatCheckboxes();
   const dur = parseFloat(document.getElementById('f-dur').value) || 0;
   const beatsRaw = document.getElementById('f-beats').value.trim();
   const beats = beatsRaw ? beatsRaw.split('\n').map(s=>s.trim()).filter(Boolean) : [];
   if (!title) { document.getElementById('f-title').focus(); return; }
+  if (!cats.length) { toast('Pick at least one category'); return; }
   closeBitModal();
   saving(true);
   try {
     if (editingBitId) {
-      await dbUpdate('bits', editingBitId, { title, cat, dur, beats });
+      await dbUpdate('bits', editingBitId, { title, cats, dur, beats });
       const b = bits.find(x => x.id === editingBitId);
-      Object.assign(b, { title, cat, dur, beats });
+      Object.assign(b, { title, cats, dur, beats });
       toast('Bit updated');
     } else {
-      const created = await dbInsert('bits', { title, cat, dur, beats });
+      const created = await dbInsert('bits', { title, cats, dur, beats });
       bits.push(created);
       toast('Bit added');
     }
@@ -462,7 +482,7 @@ function renderSets() {
                     ' ondragover="onBDragOver(event,' + s.id + ',' + idx + ')"' +
                     ' ondrop="onBReorder(event,' + s.id + ',' + idx + ')">' +
                     '<span class="tbit-num">' + (idx+1) + '</span>' +
-                    '<div class="cat-bar bar-' + b.cat + '" style="height:18px;width:3px"></div>' +
+                    '<div class="cat-bar bar-' + (b.cats && b.cats[0] || 'standard') + '" style="height:18px;width:3px"></div>' +
                     '<span class="tbit-title">' + b.title + '</span>' +
                     '<span class="tbit-dur">' + fmtDur(b.dur) + '</span>' +
                     '<button class="tbit-rm" onclick="removeBitFromSet(' + s.id + ',' + bid + ')">×</button>' +
@@ -581,6 +601,15 @@ function onTLDragLeave(e, setId) {
 // Close modals on backdrop tap
 document.getElementById('modal-bit').addEventListener('click', e => { if(e.target === e.currentTarget) closeBitModal(); });
 document.getElementById('modal-set').addEventListener('click', e => { if(e.target === e.currentTarget) closeSetModal(); });
+
+// Category checkbox visual toggle
+document.querySelectorAll('#f-cats .cat-check').forEach(label => {
+  label.addEventListener('click', () => {
+    const cb = label.querySelector('input');
+    cb.checked = !cb.checked;
+    label.classList.toggle('checked', cb.checked);
+  });
+});
 
 init();
 </script>
