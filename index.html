@@ -77,6 +77,7 @@
   .bit-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
   .cat-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; }
   .dur { font-size: 12px; color: var(--text3); font-family: 'SF Mono', 'Fira Mono', monospace; }
+  .tag-text { font-size: 11px; color: var(--text3); font-style: italic; }
   .bit-btns { display: flex; gap: 2px; }
   .icon-btn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: none; background: none; cursor: pointer; color: var(--text3); border-radius: 8px; font-size: 16px; transition: all 0.12s; }
   .icon-btn:hover { background: var(--surface2); color: var(--text); }
@@ -95,16 +96,16 @@
   .c-opener { background: #1a2e10; color: #7ec850; }
   .c-closer { background: #2e1f08; color: #e8a030; }
   .c-story { background: #0d1f35; color: #5b9fd6; }
-  .c-joke { background: #1c1535; color: #9b8fe8; }
+  .c-blue { background: #2a1018; color: #e0628a; }
   .c-clean { background: #0a2620; color: #3cc49a; }
-  .c-standard { background: #1e1d1b; color: #888680; }
+  .c-quick { background: #241a30; color: #b88fe0; }
 
   .bar-opener { background: #7ec850; }
   .bar-closer { background: #e8a030; }
   .bar-story { background: #5b9fd6; }
-  .bar-joke { background: #9b8fe8; }
+  .bar-blue { background: #e0628a; }
   .bar-clean { background: #3cc49a; }
-  .bar-standard { background: #888680; }
+  .bar-quick { background: #b88fe0; }
 
   /* FAB */
   .fab { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: 20px; width: 52px; height: 52px; border-radius: 50%; background: var(--amber); color: #0F0E0D; border: none; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(245,166,35,0.35); z-index: 40; font-weight: 300; transition: transform 0.15s; }
@@ -214,15 +215,20 @@
       <div class="form-group" style="grid-column: 1 / -1">
         <label class="form-label">Categories (pick any that apply)</label>
         <div class="cat-checks" id="f-cats">
-          <label class="cat-check" data-cat="standard"><input type="checkbox" value="standard"> Standard</label>
           <label class="cat-check" data-cat="opener"><input type="checkbox" value="opener"> Opener</label>
           <label class="cat-check" data-cat="closer"><input type="checkbox" value="closer"> Closer</label>
-          <label class="cat-check" data-cat="story"><input type="checkbox" value="story"> Story</label>
-          <label class="cat-check" data-cat="joke"><input type="checkbox" value="joke"> Joke</label>
           <label class="cat-check" data-cat="clean"><input type="checkbox" value="clean"> Clean</label>
+          <label class="cat-check" data-cat="blue"><input type="checkbox" value="blue"> Blue</label>
+          <label class="cat-check" data-cat="story"><input type="checkbox" value="story"> Story</label>
+          <label class="cat-check" data-cat="quick"><input type="checkbox" value="quick"> Quick</label>
         </div>
       </div>
       <div class="form-group"><label class="form-label">Length (min)</label><input class="form-input" id="f-dur" type="number" min="0.5" step="0.5" placeholder="e.g. 3"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tags</label>
+      <input class="form-input" id="f-tags" placeholder="e.g. family, dog, work">
+      <p class="hint">Comma-separated · totally freeform, e.g. topics like "marriage, dog, dating"</p>
     </div>
     <div class="form-group">
       <label class="form-label">Beats / transcript</label>
@@ -273,7 +279,7 @@ async function dbDelete(table, id) {
   await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method: 'DELETE', headers: H });
 }
 
-const CATS = { opener:'Opener', closer:'Closer', story:'Story', joke:'Joke', clean:'Clean', standard:'Standard' };
+const CATS = { opener:'Opener', closer:'Closer', clean:'Clean', blue:'Blue', story:'Story', quick:'Quick' };
 let bits = [], sets = [];
 let openBits = new Set(), openSets = new Set();
 let activeFilter = 'all';
@@ -333,7 +339,8 @@ function renderBits() {
     html += filtered.map(b => {
       const beats = b.beats || [];
       const cats = b.cats || [];
-      const primaryCat = cats[0] || 'standard';
+      const tags = b.tags || [];
+      const primaryCat = cats[0] || 'quick';
       const isOpen = openBits.has(b.id);
       return `
       <div class="bit-card">
@@ -344,6 +351,7 @@ function renderBits() {
             <div class="bit-meta">
               ${cats.map(c => '<span class="cat-badge c-' + c + '">' + CATS[c] + '</span>').join('')}
               <span class="dur">${fmtDur(b.dur)}</span>
+              ${tags.length ? '<span class="tag-text">' + tags.join(' · ') + '</span>' : ''}
             </div>
           </div>
           <div class="bit-btns" onclick="event.stopPropagation()">
@@ -384,8 +392,9 @@ function openAddBit() {
   editingBitId = null;
   document.getElementById('modal-bit-title').textContent = 'New bit';
   document.getElementById('f-title').value = '';
-  setCatCheckboxes(['standard']);
+  setCatCheckboxes([]);
   document.getElementById('f-dur').value = '';
+  document.getElementById('f-tags').value = '';
   document.getElementById('f-beats').value = '';
   document.getElementById('modal-bit').classList.add('open');
   setTimeout(() => document.getElementById('f-title').focus(), 100);
@@ -398,6 +407,7 @@ function openEditBit(id) {
   document.getElementById('f-title').value = b.title;
   setCatCheckboxes(b.cats || []);
   document.getElementById('f-dur').value = b.dur;
+  document.getElementById('f-tags').value = (b.tags || []).join(', ');
   document.getElementById('f-beats').value = (b.beats||[]).join('\n');
   document.getElementById('modal-bit').classList.add('open');
 }
@@ -407,6 +417,8 @@ async function saveBit() {
   const title = document.getElementById('f-title').value.trim();
   const cats = getCatCheckboxes();
   const dur = parseFloat(document.getElementById('f-dur').value) || 0;
+  const tagsRaw = document.getElementById('f-tags').value.trim();
+  const tags = tagsRaw ? tagsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
   const beatsRaw = document.getElementById('f-beats').value.trim();
   const beats = beatsRaw ? beatsRaw.split('\n').map(s=>s.trim()).filter(Boolean) : [];
   if (!title) { document.getElementById('f-title').focus(); return; }
@@ -415,12 +427,12 @@ async function saveBit() {
   saving(true);
   try {
     if (editingBitId) {
-      await dbUpdate('bits', editingBitId, { title, cats, dur, beats });
+      await dbUpdate('bits', editingBitId, { title, cats, dur, tags, beats });
       const b = bits.find(x => x.id === editingBitId);
-      Object.assign(b, { title, cats, dur, beats });
+      Object.assign(b, { title, cats, dur, tags, beats });
       toast('Bit updated');
     } else {
-      const created = await dbInsert('bits', { title, cats, dur, beats });
+      const created = await dbInsert('bits', { title, cats, dur, tags, beats });
       bits.push(created);
       toast('Bit added');
     }
@@ -482,7 +494,7 @@ function renderSets() {
                     ' ondragover="onBDragOver(event,' + s.id + ',' + idx + ')"' +
                     ' ondrop="onBReorder(event,' + s.id + ',' + idx + ')">' +
                     '<span class="tbit-num">' + (idx+1) + '</span>' +
-                    '<div class="cat-bar bar-' + (b.cats && b.cats[0] || 'standard') + '" style="height:18px;width:3px"></div>' +
+                    '<div class="cat-bar bar-' + (b.cats && b.cats[0] || 'quick') + '" style="height:18px;width:3px"></div>' +
                     '<span class="tbit-title">' + b.title + '</span>' +
                     '<span class="tbit-dur">' + fmtDur(b.dur) + '</span>' +
                     '<button class="tbit-rm" onclick="removeBitFromSet(' + s.id + ',' + bid + ')">×</button>' +
